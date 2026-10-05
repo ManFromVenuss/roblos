@@ -2012,6 +2012,9 @@ function Components.ColorPicker(
 	return api
 end
 
+
+
+
 local function withCommon(section, comp, opts)
 	if comp and opts and opts.Depends ~= nil then
 		local win = section._window
@@ -2467,9 +2470,22 @@ function deserializeFlag(v)
 	return nil
 end
 
+
+
+
+
+
+
+
+
+
 local DEFAULT_SIZE = Vector2_new(900, 620)
 local MIN_SIZE = Vector2_new(480, 320)
 local MAX_SIZE = Vector2_new(1280, 800)
+
+
+
+
 
 local function resolveWindowSize(v)
 	local x, y
@@ -2516,33 +2532,91 @@ function Window.new(
 			if _type(key) == "string" then
 				fs_values[key] = value
 
+
+
+
 				if self._refreshDeps then self._refreshDeps(key) end
 			end
 		end,
 	}
 
-	local dep_entries = {}   
-	local dep_byFlag = {}    
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	local dep_entries = {}
+	local dep_byFlag = {}
 
 	local function normDepends(spec)
 		if spec == nil then return nil end
 		local out = {}
-		local function walk(v)
+		local function walk(v, sink)
 			if _type(v) == "string" then
-				out[#out + 1] = { flag = v }
+				sink[#sink + 1] = { flag = v }
 			elseif _type(v) == "table" then
-				if _type(v.Flag) == "string" then
-					out[#out + 1] = { flag = v.Flag, want = v.Value }
+				if _type(v.Any) == "table" then
+
+
+
+
+					local sub = {}
+					walk(v.Any, sub)
+					if #sub > 0 then sink[#sink + 1] = { any = sub } end
+				elseif _type(v.Flag) == "string" then
+					sink[#sink + 1] = { flag = v.Flag, want = v.Value }
 				else
-					for _, inner in v do walk(inner) end
+					for _, inner in v do walk(inner, sink) end
 				end
 			end
 		end
-		walk(spec)
+		walk(spec, out)
 		return (#out > 0) and out or nil
 	end
 
-	local function depSatisfied(e, val)
+
+
+	local function depFlags(list, acc)
+		for _, e in list do
+			if e.any then
+				depFlags(e.any, acc)
+			elseif e.flag then
+				acc[#acc + 1] = e.flag
+			end
+		end
+		return acc
+	end
+
+	local function depSatisfied(e, read)
+		if e.any then
+			for _, sub in e.any do
+				if depSatisfied(sub, read) then return true end
+			end
+			return false
+		end
+		local val = read(e.flag)
 		if e.want == nil then
 			return val ~= nil and val ~= false
 		end
@@ -2554,6 +2628,10 @@ function Window.new(
 		end
 		return val == e.want
 	end
+
+
+
+
 
 	local function setDimmed(entry, on)
 		local inst = entry.comp and entry.comp.instance
@@ -2578,10 +2656,13 @@ function Window.new(
 		end
 	end
 
+	local function depRead(flag) return fs_values[flag] end
+
 	local function applyDep(entry)
+
 		local ok = true
 		for _, e in entry.list do
-			if not depSatisfied(e, fs_values[e.flag]) then ok = false; break end
+			if not depSatisfied(e, depRead) then ok = false; break end
 		end
 		if entry.state == ok then return end
 		entry.state = ok
@@ -2591,6 +2672,10 @@ function Window.new(
 		end
 		local comp = entry.comp
 		if comp.SetVisible then _pcall(comp.SetVisible, comp, ok) end
+
+
+
+
 
 		local sec = comp._section
 		local tab = sec and sec._tab
@@ -2602,9 +2687,11 @@ function Window.new(
 		if not (comp and list) then return end
 		local entry = { comp = comp, list = list, dim = (mode == "dim"), state = nil }
 		dep_entries[#dep_entries + 1] = entry
-		for _, e in list do
-			local bucket = dep_byFlag[e.flag]
-			if not bucket then bucket = {}; dep_byFlag[e.flag] = bucket end
+
+
+		for _, flag in depFlags(list, {}) do
+			local bucket = dep_byFlag[flag]
+			if not bucket then bucket = {}; dep_byFlag[flag] = bucket end
 			bucket[#bucket + 1] = entry
 		end
 		applyDep(entry)
@@ -2615,6 +2702,9 @@ function Window.new(
 		if not bucket then return end
 		for _, entry in bucket do applyDep(entry) end
 	end
+
+
+
 
 	self._refreshAllDeps = function()
 		for _, entry in dep_entries do applyDep(entry) end
@@ -3005,6 +3095,8 @@ function Window.new(
 			Content = content, Duration = 3,
 		})
 
+
+
 		if self._refreshAllDeps then self._refreshAllDeps() end
 		return failed == 0
 	end
@@ -3085,6 +3177,8 @@ function Window.new(
 
 	function self:Init()
 		if self._autoloadOnInit then self:LoadAutoload() end
+
+
 
 		if self._refreshAllDeps then self._refreshAllDeps() end
 	end
