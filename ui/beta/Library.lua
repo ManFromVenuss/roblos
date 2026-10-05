@@ -2052,7 +2052,17 @@ function Tab.new(window, opts)
 	self._hidden = opts.Hidden == true
 	self._maid = newMaid()
 	self._sections = {}
-	self._layoutMode = "wide"
+
+
+
+
+
+
+
+
+
+
+	self._layoutMode = "mid"
 	self._content = nil
 	self._active = false
 	self._destroyed = false
